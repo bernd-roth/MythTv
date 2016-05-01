@@ -5,8 +5,8 @@
 #
 
 # Mysql Beginning
-REMOTE_MYSQL_HOSTNAME=192.168.1.
-USER=root
+REMOTE_MYSQL_HOSTNAME=192.168.x.x
+USER=root # most of the time root
 PASS=
 # Mysql End
 
@@ -16,18 +16,18 @@ CUR_TIME=`date +%H%M`
 # Time and Date
 
 # Nas settings
-IP_ADDRESS_NAS=192.168.1.
+IP_ADDRESS_NAS=192.168.x.x
 NAS_ETHERNET_ADDRESS="" # Example: 00:00:00:00:00:00
-RECORDINGS_DIR=/var/lib/mythtv/recordings
-NAS_ADMIN=admin
-NAS_PASS=admin
+RECORDINGS_DIR=/var/lib/mythtv/recordings # most of the time
+NAS_ADMIN=
+NAS_PASS=
 NAS_DIR_MOVIES=
 # Nas settings
 
 # Log dir
-MYTH_SCRIPTS_DIR=/var/scripts
+MYTH_SCRIPTS_DIR=/var/scripts # default for me at least
 MYTH_LOG_DIR=${MYTH_SCRIPTS_DIR}/log
-MYTHTV_FILE=${MYTH_SCRIPTS_LOG}/mythtv.txt
+MYTHTV_FILE=${MYTH_LOG_DIR}/mythtv.txt
 # Log dir
 
 #
@@ -87,11 +87,11 @@ function write_file_for_further_processing {
 #
 # Check whether log dir exists
 #
-if [ ! -d ${MYTHTV_FILE} ]
+if [ ! -d ${MYTH_LOG_DIR} ]
 then
 	mkdir -p ${MYTH_LOG_DIR}
-	exit=`echo $!`
-	if [ ${EXIT} -ne 0 ]
+	EXIT_CODE=`echo $!`
+	if [ ${EXIT_CODE} -ne 0 ]
 	then
 		echo "Could not create ${MYTH_LOG_DIR}"
 		exit 99
