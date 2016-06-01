@@ -5,9 +5,9 @@
 #
 
 # Mysql Beginning
-REMOTE_MYSQL_HOSTNAME=192.168.x.x
-USER=root # most of the time root
-PASS=
+REMOTE_MYSQL_HOSTNAME=192.168.1.55
+USER=root
+PASS=3jkris6
 # Mysql End
 
 # Time and Date
@@ -16,19 +16,34 @@ CUR_TIME=`date +%H%M`
 # Time and Date
 
 # Nas settings
-IP_ADDRESS_NAS=192.168.x.x
-NAS_ETHERNET_ADDRESS="" # Example: 00:00:00:00:00:00
-RECORDINGS_DIR=/var/lib/mythtv/recordings # most of the time
-NAS_ADMIN=
-NAS_PASS=
-NAS_DIR_MOVIES=
+IP_ADDRESS_NAS=192.168.1.16
+NAS_ETHERNET_ADDRESS="00:08:9B:C7:3D:78" # Example: 00:00:00:00:00:00
+RECORDINGS_DIR=/var/lib/mythtv/recordings
+NAS_ADMIN=admin
+NAS_PASS=admin
+NAS_DIR_MOVIES=/share/Bernd/Filme/
 # Nas settings
 
 # Log dir
-MYTH_SCRIPTS_DIR=/var/scripts # default for me at least
+MYTH_SCRIPTS_DIR=/var/scripts
 MYTH_LOG_DIR=${MYTH_SCRIPTS_DIR}/log
 MYTHTV_FILE=${MYTH_LOG_DIR}/mythtv.txt
 # Log dir
+
+#
+# calling logger function
+#
+function logger {
+	echo $1
+	if [ ! -z $2 ]
+	then
+		EXIT_CODE=$2
+		if [ ${EXIT_CODE} -ne 0 ]
+		then
+			exit ${EXIT_CODE}
+		fi
+	fi
+}
 
 #
 # delete already copied entry from db
@@ -47,15 +62,11 @@ function delete_local_file {
 	FILE=$1
 	if [ "${FILE}" != "" ]
 	then
-		echo "Fourth Step"
-		echo "Going to delete local file: " "${RECORDINGS_DIR}/${FILE}"
+		logger "Fourth Step"
+		logger "Going to delete local file: ${RECORDINGS_DIR}/${FILE}"
 		rm -r ${RECORDINGS_DIR}/${FILE}*
 		EXIT_CODE=`echo $?`
-		if [ ${EXIT_CODE} -ne 0 ]
-		then
-			echo "Could not delete local file"
-			exit ${EXIT_CODE}
-		fi
+		logger "Could not delete local file, exiting.." ${EXIT_CODE}
 	fi
 }
 
@@ -74,10 +85,10 @@ function ping_ip {
 		RETURN_CODE=`echo $?`
 		if [ ${RETURN_CODE} -ne 0 ]
 		then
-			echo "Nas is not online yet, waiting for another 360 seconds"
+			logger "Nas is not online yet, waiting for another 360 seconds"
 			sleep 360
 		else
-			echo "Nas is awake"
+			logger "Nas is awake"
 			sleep 240
 		fi
 	done
@@ -93,7 +104,7 @@ then
 	EXIT_CODE=`echo $!`
 	if [ ${EXIT_CODE} -ne 0 ]
 	then
-		echo "Could not create ${MYTH_LOG_DIR}"
+		logger "Could not create ${MYTH_LOG_DIR}"
 		exit 99
 	fi
 fi
@@ -101,8 +112,8 @@ fi
 #
 # connect to remote mysql db and write file
 #
-echo "First Step"
-echo "Going to connect to db"
+logger "First Step"
+logger "Going to connect to db"
 mysql -u ${USER} -p${PASS} -N -e "SELECT basename, CONVERT_TZ(endtime, 'GMT', 'Europe/Vienna'), title from mythconverg.recorded WHERE storagegroup = 'Default' ORDER BY endtime LIMIT 1" | tr '\t' ';' > ${MYTHTV_FILE}
 
 #
@@ -110,11 +121,11 @@ mysql -u ${USER} -p${PASS} -N -e "SELECT basename, CONVERT_TZ(endtime, 'GMT', 'E
 #
 if [ `wc -l ${MYTHTV_FILE} | cut -d' ' -f1` -eq 0 ]
 then
-	echo "No movie available, exiting"
+	logger "No movie available, exiting"
 	exit 0
 fi
 AVAILABLE_MOVIE=`cat "${MYTHTV_FILE}"`
-echo "This movie is available: " ${AVAILABLE_MOVIE}
+logger "This movie is available: ${AVAILABLE_MOVIE}"
 }
 
 function movie_finished {
@@ -132,92 +143,70 @@ ENDTIME=${ENDTIME_HOUR}${ENDTIME_MINUTE}
 MOVIE=`cut -d';' -f1 ${MYTHTV_FILE} | head -1`
 MOVIE_NAME=`cut -d';' -f3 ${MYTHTV_FILE} | head -1`
 
-echo "Second Step"
-echo "Current Date: ${CUR_DATE} - End Date: ${ENDDATE}"
+logger "Second step"
+logger "Current Date: ${CUR_DATE} - End Date: ${ENDDATE}"
 
 if [ "${CUR_DATE}" = "${ENDDATE}" ]
 then
 	if [ ${CUR_TIME} -gt ${ENDTIME} ]
 	then
-		echo "${CUR_TIME} is greater than  ${ENDTIME}, therefore further processing"
-		echo "Time to wol copy movies, pinging ${IP_ADDRESS_NAS}, and everything else"
+		logger "${CUR_TIME} is greater than ${ENDTIME}, therefore further processing"
+		logger "Time to wol nas, copy movies, pinging ${IP_ADDRESS_NAS}, and everything else"
 		ping_ip ${IP_ADDRESS_NAS}
 		cd ${RECORDINGS_DIR}
 		sudo mount -t cifs -o username=${NAS_ADMIN},dir_mode=0777,file_mode=0666,password=${NAS_PASS} //${IP_ADDRESS_NAS}:${NAS_DIR_MOVIES} /mnt/
 		EXIT_CODE=`echo $?`
-		if [ ${EXIT_CODE} -ne 0 ]
-		then
-			echo "Could not mount Nas"
-			exit ${EXIT_CODE}
-		fi
+		logger "Could not mount Nas" ${EXIT_CODE}
 		cd /mnt
 		if [ -d "${MOVIE_NAME}" ]
 		then
-			echo "Need not create directory since it is already available"
-			echo "Going to write files to test directory of nas"
+			logger "Need not create directory since it is already available"
+			logger "Going to write files to test directory of nas"
 			cd test
-			cp ${RECORDINGS_DIR}/${MOVIE} test/${MOVIE}
-			cp ${RECORDINGS_DIR}/${MOVIE}.png test/${MOVIE}.png
+			mkdir "${MOVIE_NAME}"
+			EXIT_CODE=`echo $?`
+			logger "Creating ${MOVIE_NAME} in test not possible, exiting" ${EXIT_CODE}
+			cp ${RECORDINGS_DIR}/${MOVIE} ${MOVIE}
+			EXIT_CODE=`echo $?`
+			logger "Copying ${RECORDINGS_DIR}/${MOVIE} ${MOVIE} not possible, exiting" ${EXIT_CODE}
+			cp ${RECORDINGS_DIR}/${MOVIE}.png ${MOVIE}.png
+			EXIT_CODE=`echo $?`
+			logger "Copying ${RECORDINGS_DIR}/${MOVIE}.png test/${MOVIE}.png not possible, exiting" ${EXIT_CODE}
 		else
 			mkdir "${MOVIE_NAME}"
+			EXIT_CODE=`echo $?`
+			logger "Creating ${MOVIE_NAME} not possible, exiting" ${EXIT_CODE}
 			cd "${MOVIE_NAME}"
 			cp ${RECORDINGS_DIR}/${MOVIE} ${MOVIE}
+			EXIT_CODE=`echo $?`
+			logger "Copying ${RECORDINGS_DIR}/${MOVIE} ${MOVIE} not possible, exiting" ${EXIT_CODE}
 			cp ${RECORDINGS_DIR}/${MOVIE}.png ${MOVIE}.png
+			EXIT_CODE=`echo $?`
+			logger "Copying ${RECORDINGS_DIR}/${MOVIE}.png ${MOVIE}.png not possible, exiting" ${EXIT_CODE}
 		fi
 		cd
+		logger "Going to umount Nas"
 		sudo umount /mnt
+		logger "Could not umount Nas" ${EXIT_CODE}
+		cd /mnt
 	else
-		echo "Current recording is still under progress"
-		echo "Endtime will be at ${ENDTIME}"
-		echo "Exiting script"
+		logger "Current recording is still under progress"
+		logger "Endtime will be at ${ENDTIME}"
+		logger "Exiting script"
 		exit 0
 	fi
 elif [ "${CUR_DATE}" != "${ENDDATE}" ]
 then
-	echo "Current date is greater than end date"
-	echo "Time to wol copy movies, pinging ${IP_ADDRESS_NAS}, and everything else"
-	ping_ip ${IP_ADDRESS_NAS}
-	cd ${RECORDINGS_DIR}
-	sudo mount -t cifs -o username=${NAS_ADMIN},dir_mode=0777,file_mode=0666,password=${NAS_PASS} //${IP_ADDRESS_NAS}:${NAS_DIR_MOVIES} /mnt/
-	EXIT_CODE=`echo $?`
-	if [ ${EXIT_CODE} -ne 0 ]
-	then
-		echo "Could not mount Nas"
-		exit ${EXIT_CODE}
-	fi
-	cd /mnt
-	if [ -d "${MOVIE_NAME}" ]
-	then
-		echo "Need not create directory since it is already available"
-		echo "Going to write files to test directory of nas"
-		cd test
-		cp ${RECORDINGS_DIR}/${MOVIE} test/${MOVIE}
-		cp ${RECORDINGS_DIR}/${MOVIE}.png test/${MOVIE}.png
-	else
-		echo "Creating directory ${MOVIE_NAME}"
-		mkdir "${MOVIE_NAME}"
-		cd "${MOVIE_NAME}"
-		echo "Copying movie ${MOVIE}"
-		cp ${RECORDINGS_DIR}/${MOVIE} ${MOVIE}
-		echo "Copying picture ${MOVIE}.png"
-		cp ${RECORDINGS_DIR}/${MOVIE}.png ${MOVIE}.png
-	fi
-	cd
-	echo "Going to umount Nas"
-	sudo umount /mnt
-	if [ ${EXIT_CODE} -ne 0 ]
-	then
-		echo "Could not umount Nas"
-		exit ${EXIT_CODE}
-	fi
-	cd /mnt
+	logger "Current date is not the same as end dat"
+	logger "Aborting further processing"
+	exit 0
 fi
 }
 
-echo "##########################"
+logger "##########################"
 echo "Date"$'\t\t'"Time"
 echo "${CUR_DATE}"$'\t'"${CUR_TIME}"
-echo "##########################"
+logger "##########################"
 
 #
 # first step
@@ -251,8 +240,8 @@ delete_local_file "${MOVIE}"
 #
 # shut down nas
 #
-echo "Fifth Step"
-echo "Going to shut down nas"
+logger "Fifth Step"
+logger "Going to shut down nas"
 ssh ${NAS_ADMIN}@${IP_ADDRESS_NAS}<<EOF
 poweroff
 exit
